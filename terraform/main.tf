@@ -164,28 +164,6 @@ resource "aws_iam_role_policy_attachment" "ecs_app_policy_attach" {
   role       = aws_iam_role.ecs_task_exec_role.name
   policy_arn = aws_iam_policy.ecs_app_policy.arn
 }
-resource "aws_iam_role_policy" "ecs_app_access_policy" {
-  name = "ecs-app-access"
-  role = aws_iam_role.ecs_task_exec_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Action = [
-          "ssm:GetParameter",
-          "sqs:SendMessage",
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes",
-          "s3:PutObject"
-        ],
-        Resource = "*"
-      }
-    ]
-  })
-}
 
 # --------------------
 # CloudWatch Logs
