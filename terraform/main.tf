@@ -131,7 +131,39 @@ resource "aws_iam_role_policy_attachment" "ecs_task_exec_policy" {
   role       = aws_iam_role.ecs_task_exec_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
+resource "aws_iam_policy" "ecs_app_policy" {
+  name        = "checkpoint-ecs-app-policy"
+  description = "Allow ECS tasks to access SSM and SQS"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ],
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
 
+resource "aws_iam_role_policy_attachment" "ecs_app_policy_attach" {
+  role       = aws_iam_role.ecs_task_exec_role.name
+  policy_arn = aws_iam_policy.ecs_app_policy.arn
+}
 resource "aws_iam_role_policy" "ecs_app_access_policy" {
   name = "ecs-app-access"
   role = aws_iam_role.ecs_task_exec_role.id
