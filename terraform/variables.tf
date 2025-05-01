@@ -10,6 +10,6 @@ variable "api_token" {
 variable "create_listener" {
   description = "Whether to create the ALB listener on first apply; afterwards leave false to skip if it already exists."
   type        = bool
-  default     = false
+  default     = true
 }
 
