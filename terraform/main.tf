@@ -1,31 +1,10 @@
-####################
-# VARIABLES
-####################
-variable "region" {
-  type    = string
-  default = "us-east-1"
-}
-
-variable "api_token" {
-  type = string
-}
-
-variable "create_listener" {
-  type    = bool
-  default = false
-  description = "Set true on first apply to create the ALB listener; afterwards, leave false to skip creation if it already exists."
-}
-
-####################
-# PROVIDER
-####################
 provider "aws" {
   region = var.region
 }
 
-####################
-# VPC & NETWORKING
-####################
+# --------------------
+# VPC & Networking
+# --------------------
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
 }
@@ -93,23 +72,23 @@ resource "aws_security_group" "ecs_sg" {
   }
 }
 
-####################
-# ECS CLUSTER
-####################
+# --------------------
+# ECS Cluster
+# --------------------
 resource "aws_ecs_cluster" "main" {
   name = "checkpoint-ecs-cluster"
 }
 
-####################
-# SQS QUEUE
-####################
+# --------------------
+# SQS Queue
+# --------------------
 resource "aws_sqs_queue" "messages" {
   name = "checkpoint-message-queue"
 }
 
-####################
-# S3 BUCKET
-####################
+# --------------------
+# S3 Bucket
+# --------------------
 resource "random_id" "bucket_id" {
   byte_length = 4
 }
@@ -119,9 +98,9 @@ resource "aws_s3_bucket" "storage" {
   force_destroy = true
 }
 
-####################
-# SSM PARAMETER
-####################
+# --------------------
+# SSM Parameter
+# --------------------
 resource "aws_ssm_parameter" "api_token" {
   name      = "checkpoint-api-token"
   type      = "SecureString"
@@ -129,17 +108,17 @@ resource "aws_ssm_parameter" "api_token" {
   overwrite = true
 }
 
-####################
-# IAM FOR ECS TASK
-####################
+# --------------------
+# IAM Role for ECS Task
+# --------------------
 resource "aws_iam_role" "ecs_task_exec_role" {
   name = "checkpoint-ecs-task-exec-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
+      Effect    = "Allow"
       Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action = "sts:AssumeRole"
+      Action    = "sts:AssumeRole"
     }]
   })
 }
@@ -149,7 +128,9 @@ resource "aws_iam_role_policy_attachment" "ecs_task_exec_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Imported existing policy
+# --------------------
+# Imported IAM Policy
+# --------------------
 data "aws_iam_policy" "ecs_app_policy" {
   name = "checkpoint-ecs-app-policy"
 }
@@ -159,9 +140,9 @@ resource "aws_iam_role_policy_attachment" "ecs_app_policy_attach" {
   policy_arn = data.aws_iam_policy.ecs_app_policy.arn
 }
 
-####################
-# CLOUDWATCH LOGS
-####################
+# --------------------
+# CloudWatch Logs
+# --------------------
 resource "aws_cloudwatch_log_group" "api_log_group" {
   name              = "/ecs/api"
   retention_in_days = 7
@@ -172,9 +153,9 @@ resource "aws_cloudwatch_log_group" "worker_log_group" {
   retention_in_days = 7
 }
 
-####################
-# ECS TASK DEFINITIONS
-####################
+# --------------------
+# ECS Task Definitions
+# --------------------
 resource "aws_ecs_task_definition" "api" {
   family                   = "api-service-task"
   network_mode             = "awsvpc"
@@ -185,8 +166,8 @@ resource "aws_ecs_task_definition" "api" {
   task_role_arn            = aws_iam_role.ecs_task_exec_role.arn
 
   container_definitions = jsonencode([{
-    name      = "api"
-    image     = "netaaviv100/api-service:latest"
+    name         = "api"
+    image        = "netaaviv100/api-service:latest"
     portMappings = [{ containerPort = 5000, hostPort = 5000 }]
     environment = [
       { name = "SSM_TOKEN_NAME", value = aws_ssm_parameter.api_token.name },
@@ -230,9 +211,9 @@ resource "aws_ecs_task_definition" "worker" {
   }])
 }
 
-####################
-# IMPORTED ALB & TARGET GROUP
-####################
+# --------------------
+# Imported ALB & TG
+# --------------------
 data "aws_lb" "api_alb" {
   name = "api-service-alb"
 }
@@ -241,23 +222,14 @@ data "aws_lb_target_group" "api_tg" {
   name = "api-target-group"
 }
 
-####################
-# EXISTING LISTENER LOOKUP
-####################
-# This will error if not found; use create_listener only when you want to create it.
-data "aws_lb_listener" "maybe" {
+# --------------------
+# Conditional Listener
+# --------------------
+resource "aws_lb_listener" "api_listener" {
+  count             = var.create_listener ? 1 : 0
   load_balancer_arn = data.aws_lb.api_alb.arn
   port              = 80
-}
-
-####################
-# CONDITIONAL LISTENER CREATION
-####################
-resource "aws_lb_listener" "api_listener" {
-  count              = var.create_listener ? 1 : 0
-  load_balancer_arn  = data.aws_lb.api_alb.arn
-  port               = 80
-  protocol           = "HTTP"
+  protocol          = "HTTP"
 
   default_action {
     type             = "forward"
@@ -265,9 +237,9 @@ resource "aws_lb_listener" "api_listener" {
   }
 }
 
-####################
-# ECS SERVICES
-####################
+# --------------------
+# ECS Services
+# --------------------
 resource "aws_ecs_service" "api_service" {
   name            = "api-service"
   cluster         = aws_ecs_cluster.main.id
@@ -276,8 +248,8 @@ resource "aws_ecs_service" "api_service" {
   desired_count   = 1
 
   network_configuration {
-    subnets         = [aws_subnet.public.id, aws_subnet.public_2.id]
-    security_groups = [aws_security_group.ecs_sg.id]
+    subnets          = [aws_subnet.public.id, aws_subnet.public_2.id]
+    security_groups  = [aws_security_group.ecs_sg.id]
     assign_public_ip = true
   }
 
@@ -286,9 +258,6 @@ resource "aws_ecs_service" "api_service" {
     container_name   = "api"
     container_port   = 5000
   }
-
-  # Ensure the listener exists before registering the service
-  depends_on = var.create_listener ? [aws_lb_listener.api_listener] : []
 }
 
 resource "aws_ecs_service" "worker_service" {
@@ -299,8 +268,8 @@ resource "aws_ecs_service" "worker_service" {
   desired_count   = 1
 
   network_configuration {
-    subnets         = [aws_subnet.public.id, aws_subnet.public_2.id]
-    security_groups = [aws_security_group.ecs_sg.id]
+    subnets          = [aws_subnet.public.id, aws_subnet.public_2.id]
+    security_groups  = [aws_security_group.ecs_sg.id]
     assign_public_ip = true
   }
 }
