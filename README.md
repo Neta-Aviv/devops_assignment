@@ -48,7 +48,6 @@ Using **GitHub Actions**, the pipeline includes:
 | AWS_SECRET_ACCESS_KEY   | IAM user secret                        |
 | DOCKERHUB_USERNAME      | Docker Hub username                    |
 | DOCKERHUB_PASSWORD      | Docker Hub password or access token    |
-| EC2_KEY_NAME            | EC2 key pair name for SSH (if needed)  |
 
 ---
 
