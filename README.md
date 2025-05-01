@@ -62,7 +62,9 @@ curl -X POST http://<your-lb-dns>/message
 -H "Content-Type: application/json"
 -d '{"message": "Hello from Neta!"}'
 
+Expected response:
 
+{ "status": "Message sent to SQS" }
 
 ---
 
@@ -81,6 +83,15 @@ To remove all resources:
 cd terraform 
 terraform destroy
 
+
+---
+## 📁 Project Structure
+
+api-service/         # Flask app with SSM + SQS integration  
+worker-service/      # Python service that polls SQS and writes to S3  
+terraform/           # Infrastructure as Code  
+.github/workflows/   # CI/CD pipeline definitions  
+README.md            # Project documentation
 
 ---
 
