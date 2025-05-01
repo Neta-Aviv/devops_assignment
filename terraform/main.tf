@@ -91,13 +91,13 @@ resource "aws_sqs_queue" "messages" {
 # --------------------
 # S3 Bucket
 # --------------------
+resource "random_id" "bucket_id" {
+  byte_length = 4
+}
+
 resource "aws_s3_bucket" "storage" {
   bucket        = "checkpoint-s3-${random_id.bucket_id.hex}"
   force_destroy = true
-}
-
-resource "random_id" "bucket_id" {
-  byte_length = 4
 }
 
 # --------------------
@@ -119,9 +119,7 @@ resource "aws_iam_role" "ecs_task_exec_role" {
     Version = "2012-10-17",
     Statement = [{
       Effect = "Allow",
-      Principal = {
-        Service = "ecs-tasks.amazonaws.com"
-      },
+      Principal = { Service = "ecs-tasks.amazonaws.com" },
       Action = "sts:AssumeRole"
     }]
   })
@@ -131,38 +129,17 @@ resource "aws_iam_role_policy_attachment" "ecs_task_exec_policy" {
   role       = aws_iam_role.ecs_task_exec_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
-resource "aws_iam_policy" "ecs_app_policy" {
-  name        = "checkpoint-ecs-app-policy"
-  description = "Allow ECS tasks to access SSM and SQS"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect   = "Allow",
-        Action   = [
-          "ssm:GetParameter",
-          "ssm:GetParameters",
-          "ssm:GetParametersByPath"
-        ],
-        Resource = "*"
-      },
-      {
-        Effect   = "Allow",
-        Action   = [
-          "sqs:SendMessage",
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes"
-        ],
-        Resource = "*"
-      }
-    ]
-  })
+
+# --------------------
+# IMPORTED IAM Policy
+# --------------------
+data "aws_iam_policy" "ecs_app_policy" {
+  name = "checkpoint-ecs-app-policy"
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_app_policy_attach" {
   role       = aws_iam_role.ecs_task_exec_role.name
-  policy_arn = aws_iam_policy.ecs_app_policy.arn
+  policy_arn = data.aws_iam_policy.ecs_app_policy.arn
 }
 
 # --------------------
@@ -188,24 +165,21 @@ resource "aws_ecs_task_definition" "api" {
   cpu                      = 256
   memory                   = 512
   execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
-  task_role_arn      = aws_iam_role.ecs_task_exec_role.arn 
+  task_role_arn            = aws_iam_role.ecs_task_exec_role.arn
 
-  container_definitions = jsonencode([{
-    name      = "api"
-    image     = "netaaviv100/api-service:latest"
-    portMappings = [{
-      containerPort = 5000
-      hostPort      = 5000
-    }]
+  container_definitions = jsonencode([{ 
+    name      = "api",
+    image     = "netaaviv100/api-service:latest",
+    portMappings = [{ containerPort = 5000, hostPort = 5000 }],
     environment = [
       { name = "SSM_TOKEN_NAME", value = aws_ssm_parameter.api_token.name },
       { name = "SQS_QUEUE_URL",  value = aws_sqs_queue.messages.id }
-    ]
+    ],
     logConfiguration = {
-      logDriver = "awslogs"
+      logDriver = "awslogs",
       options = {
-        awslogs-group         = aws_cloudwatch_log_group.api_log_group.name
-        awslogs-region        = var.region
+        awslogs-group         = aws_cloudwatch_log_group.api_log_group.name,
+        awslogs-region        = var.region,
         awslogs-stream-prefix = "ecs"
       }
     }
@@ -219,20 +193,20 @@ resource "aws_ecs_task_definition" "worker" {
   cpu                      = 256
   memory                   = 512
   execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
-  task_role_arn      = aws_iam_role.ecs_task_exec_role.arn 
+  task_role_arn            = aws_iam_role.ecs_task_exec_role.arn
 
-  container_definitions = jsonencode([{
-    name  = "worker"
-    image = "netaaviv100/worker-service:latest"
+  container_definitions = jsonencode([{ 
+    name  = "worker",
+    image = "netaaviv100/worker-service:latest",
     environment = [
       { name = "SQS_QUEUE_URL", value = aws_sqs_queue.messages.id },
       { name = "S3_BUCKET_NAME", value = aws_s3_bucket.storage.bucket }
-    ]
+    ],
     logConfiguration = {
-      logDriver = "awslogs"
+      logDriver = "awslogs",
       options = {
-        awslogs-group         = aws_cloudwatch_log_group.worker_log_group.name
-        awslogs-region        = var.region
+        awslogs-group         = aws_cloudwatch_log_group.worker_log_group.name,
+        awslogs-region        = var.region,
         awslogs-stream-prefix = "ecs"
       }
     }
@@ -240,43 +214,24 @@ resource "aws_ecs_task_definition" "worker" {
 }
 
 # --------------------
-# Application Load Balancer
+# IMPORTED ALB & TARGET GROUP
 # --------------------
-resource "aws_lb" "api_alb" {
-  name               = "api-service-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.ecs_sg.id]
-  subnets            = [aws_subnet.public.id, aws_subnet.public_2.id]
-
-  depends_on = [aws_security_group.ecs_sg]
+data "aws_lb" "api_alb" {
+  name = "api-service-alb"
 }
 
-resource "aws_lb_target_group" "api_tg" {
-  name        = "api-target-group"
-  port        = 5000
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
-
-  health_check {
-    path                = "/"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    matcher             = "200"
-  }
+data "aws_lb_target_group" "api_tg" {
+  name = "api-target-group"
 }
 
 resource "aws_lb_listener" "api_listener" {
-  load_balancer_arn = aws_lb.api_alb.arn
+  load_balancer_arn = data.aws_lb.api_alb.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.api_tg.arn
+    target_group_arn = data.aws_lb_target_group.api_tg.arn
   }
 }
 
@@ -297,7 +252,7 @@ resource "aws_ecs_service" "api_service" {
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.api_tg.arn
+    target_group_arn = data.aws_lb_target_group.api_tg.arn
     container_name   = "api"
     container_port   = 5000
   }
@@ -318,4 +273,3 @@ resource "aws_ecs_service" "worker_service" {
     assign_public_ip = true
   }
 }
-
