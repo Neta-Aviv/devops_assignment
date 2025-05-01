@@ -226,7 +226,7 @@ data "aws_lb_target_group" "api_tg" {
 # Conditional Listener
 # --------------------
 resource "aws_lb_listener" "api_listener" {
-  count             = var.create_listener ? 1 : 0
+  count             = length(data.aws_lb.api_alb.id) == 0 ? 1 : 0
   load_balancer_arn = data.aws_lb.api_alb.arn
   port              = 80
   protocol          = "HTTP"
