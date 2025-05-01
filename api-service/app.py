@@ -16,19 +16,53 @@ def root():
     <html>
         <head>
             <title>Neta Aviv API Service</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    background-color: #f4f4f4;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    margin: 0;
+                }
+                .container {
+                    background-color: white;
+                    padding: 40px;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                    max-width: 500px;
+                    text-align: center;
+                }
+                h2 {
+                    color: #2c3e50;
+                }
+                p, pre {
+                    color: #34495e;
+                }
+                pre {
+                    background-color: #ecf0f1;
+                    padding: 10px;
+                    border-radius: 5px;
+                    text-align: left;
+                }
+            </style>
         </head>
         <body>
-            <h2>Neta Aviv API Service</h2>
-            <p>Status: Running</p>
-            <p>Send a POST request to /message</p>
-            <p>Include the header: Authorization</p>
-            <p>And a JSON body like:</p>
-            <pre>{
+            <div class="container">
+                <h2>Neta Aviv API Service</h2>
+                <p>Status: ✅ Running</p>
+                <p>Send a <strong>POST</strong> request to <code>/message</code></p>
+                <p>Include the header: <code>Authorization</code></p>
+                <p>And a JSON body like:</p>
+                <pre>{
   "message": "Hello from Neta!"
 }</pre>
+            </div>
         </body>
     </html>
     """, 200
+
 
 @app.route("/message", methods=["POST"])
 def send_message():
