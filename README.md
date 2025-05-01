@@ -6,7 +6,7 @@ This project showcases a production-style deployment of two microservices (API &
 
 - Terraform for infrastructure provisioning  
 - ECS Fargate for containerized deployment  
-- Application Load Balancer (ALB) for traffic routing  
+- Application Load Balancer (ALB) for traffic routing 
 - S3, SQS, and SSM for service integrations  
 - GitHub Actions for CI/CD pipeline
 
